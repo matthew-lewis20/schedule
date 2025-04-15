@@ -50309,6 +50309,7 @@ const run = async () => {
     };
     const scheduleRun = async () => {
         let _schedules = await getSchedules();
+        (0, core_1.info)(`number of schedules: ${_schedules.length}`);
         (0, core_1.info)(`⌚ ${dateTimeFormatter.format(new Date(Date.now()))}`);
         (0, core_1.info)(`📅 Found ${_schedules.length} scheduled workflows:\n${_schedules.map((schedule) => {
             const _workflow = workflows.find((workflow) => workflow.id === +schedule.workflow_id);
