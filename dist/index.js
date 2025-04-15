@@ -50377,7 +50377,7 @@ const run = async () => {
         await scheduleAdd();
     }
     await scheduleRun();
-    if (inputs.skipSummary === 'false') {
+    if (inputs.skipSummary.toLowerCase() === 'false') {
         await summaryWrite();
     }
     else {
