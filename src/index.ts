@@ -64,33 +64,36 @@ export const run = async (): Promise<void> => {
     return 'in ' + Object.entries(duration).map(([key, value]) => `${value} ${key}`).join(', ');
   };
   const variablePrefix = '_SCHEDULE'
-  const workflows = (await octokit.rest.actions.listRepoWorkflows(ownerRepo)).data.workflows;
+  const workflows = (await octokit.rest.actions.listRepoWorkflows({...ownerRepo, per_page: 100})).data.workflows;
   const workflow = workflows.find((workflow) => workflow.path.endsWith(inputs.workflow) || workflow.name === inputs.workflow || workflow.id === +inputs.workflow);
   if (!workflow) {
     throw new Error(`Workflow ${inputs.workflow} not found in ${ownerRepo.owner}/${ownerRepo.repo}`);
   }
   const workflowId = workflow?.id;
-  const variableName = (date: Date) => [variablePrefix, workflowId, date.valueOf()].join('_');
+  const uuid = process.env.GITHUB_RUN_ID;
+  const variableName = (date: Date) => [variablePrefix, workflowId, date.valueOf(), uuid].join('_');
   const variableValue = (ref: string, inputs: object) => `${ref},${inputs ? JSON.stringify(inputs) : ''}`;
   const getSchedules = async () => {
-    const { data: { variables } } = await octokit.rest.actions.listRepoVariables(ownerRepo);
-    if (!variables) return [];
-    const schedules = variables.filter((variable) => variable.name.startsWith(variablePrefix)).map((variable) => {
-      const parts = variable.name.split('_');
-      const valParts = variable.value.split(/,(.*)/s);
-      const workflowInputs = valParts[1] && valParts[1].trim().length > 0 ? JSON.parse(valParts[1]) : undefined;
-      const inputsIgnore = inputs.inputsIgnore?.split(',').map((key) => key.trim());
-      inputsIgnore?.forEach((key) => {
-        if (workflowInputs?.[key]) delete workflowInputs[key];
+    const schedules = await octokit.paginate(octokit.rest.actions.listRepoVariables, {...ownerRepo, per_page: 100})
+      .then((variables) => {
+        if (!variables) return [];
+        return variables.filter((variable) => variable.name.startsWith(variablePrefix)).map((variable) => {
+          const parts = variable.name.split('_');
+          const valParts = variable.value.split(/,(.*)/s);
+          const workflowInputs = valParts[1] && valParts[1].trim().length > 0 ? JSON.parse(valParts[1]) : undefined;
+          const inputsIgnore = inputs.inputsIgnore?.split(',').map((key) => key.trim());
+          inputsIgnore?.forEach((key) => {
+            if (workflowInputs?.[key]) delete workflowInputs[key];
+          });
+          return {
+            variableName: variable.name,
+            workflow_id: parts[2],
+            date: new Date(+parts[3]),
+            ref: valParts[0],
+            inputs: workflowInputs
+          }
+        });
       });
-      return {
-        variableName: variable.name,
-        workflow_id: parts[2],
-        date: new Date(+parts[3]),
-        ref: valParts[0],
-        inputs: workflowInputs
-      }
-    });
     return schedules;
   };
   const scheduleAdd = async () => {
@@ -113,15 +116,15 @@ export const run = async (): Promise<void> => {
       return `${_workflow?.path || schedule.workflow_id}@${schedule.ref} will run ${durationString(new Date(Date.now()), schedule.date)} (${dateTimeFormatter.format(schedule.date)})}`
     }).join('\n')}`);
     const startTime = Date.now().valueOf();
-    return group('👀 Looking for scheduled workflows to run', async () => {
-      do {
-        info(`👀 ... It's currently ${new Date().toLocaleTimeString()} and ${_schedules.length} workflows are scheduled to run.`);
-        if (inputs.skipCheckWorkflows.toLowerCase() === 'false') {
+    if (inputs.skipCheckWorkflows.toLowerCase() === 'false') {
+      return group('👀 Looking for scheduled workflows to run', async () => {
+        do {
+          info(`👀 ... It's currently ${new Date().toLocaleTimeString()} and ${_schedules.length} workflows are scheduled to run.`);
           for (const [index, schedule] of _schedules.entries()) {
             if (Date.now().valueOf() < schedule.date.valueOf()) continue;
             const _workflow = workflows.find((workflow) => workflow.id === +schedule.workflow_id);
             info(`🚀 Running ${_workflow?.path || schedule.workflow_id}@ref:${schedule.ref} set for ${dateTimeFormatter.format(schedule.date)}`);
-  
+
             await octokit.rest.actions.createWorkflowDispatch({
               ...ownerRepo,
               workflow_id: schedule.workflow_id,
@@ -133,21 +136,21 @@ export const run = async (): Promise<void> => {
               ...ownerRepo,
               name: schedule.variableName,
             }))
-  
+
             _schedules.splice(index, 1);
           }
-        } else {
-          info('Skipped running workflows...');
-        }
-        
-        if (inputs.waitMs > 0) {
-          await new Promise((resolve) => setTimeout(resolve, inputs.waitDelayMs));
-        }
+          
+          if (inputs.waitMs > 0) {
+            await new Promise((resolve) => setTimeout(resolve, inputs.waitDelayMs));
+          }
 
-        _schedules = await getSchedules();
-      } while (inputs.waitMs > (Date.now().valueOf() - startTime) && _schedules.length);
-      info(`😪 No more workflows to run. I'll try again next time...`);
-    });
+          _schedules = await getSchedules();
+        } while (inputs.waitMs > (Date.now().valueOf() - startTime) && _schedules.length);
+        info(`😪 No more workflows to run. I'll try again next time...`);
+      });
+    } else {
+      return info('⏩ Skipped running workflows...');
+    }
   };
   const summaryWrite = async () => {
     const schedules = await getSchedules();
@@ -180,7 +183,7 @@ export const run = async (): Promise<void> => {
   if (inputs.skipSummary.toLowerCase() === 'false') {
     await summaryWrite();
   } else {
-    info('Skipped showing summary...');
+    info('⏩ Skipped showing summary...');
   }
 };
 

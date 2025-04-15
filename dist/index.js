@@ -50263,34 +50263,37 @@ const run = async () => {
         return 'in ' + Object.entries(duration).map(([key, value]) => `${value} ${key}`).join(', ');
     };
     const variablePrefix = '_SCHEDULE';
-    const workflows = (await octokit.rest.actions.listRepoWorkflows(ownerRepo)).data.workflows;
+    const workflows = (await octokit.rest.actions.listRepoWorkflows({ ...ownerRepo, per_page: 100 })).data.workflows;
     const workflow = workflows.find((workflow) => workflow.path.endsWith(inputs.workflow) || workflow.name === inputs.workflow || workflow.id === +inputs.workflow);
     if (!workflow) {
         throw new Error(`Workflow ${inputs.workflow} not found in ${ownerRepo.owner}/${ownerRepo.repo}`);
     }
     const workflowId = workflow?.id;
-    const variableName = (date) => [variablePrefix, workflowId, date.valueOf()].join('_');
+    const uuid = process.env.GITHUB_RUN_ID;
+    const variableName = (date) => [variablePrefix, workflowId, date.valueOf(), uuid].join('_');
     const variableValue = (ref, inputs) => `${ref},${inputs ? JSON.stringify(inputs) : ''}`;
     const getSchedules = async () => {
-        const { data: { variables } } = await octokit.rest.actions.listRepoVariables(ownerRepo);
-        if (!variables)
-            return [];
-        const schedules = variables.filter((variable) => variable.name.startsWith(variablePrefix)).map((variable) => {
-            const parts = variable.name.split('_');
-            const valParts = variable.value.split(/,(.*)/s);
-            const workflowInputs = valParts[1] && valParts[1].trim().length > 0 ? JSON.parse(valParts[1]) : undefined;
-            const inputsIgnore = inputs.inputsIgnore?.split(',').map((key) => key.trim());
-            inputsIgnore?.forEach((key) => {
-                if (workflowInputs?.[key])
-                    delete workflowInputs[key];
+        const schedules = await octokit.paginate(octokit.rest.actions.listRepoVariables, { ...ownerRepo, per_page: 100 })
+            .then((variables) => {
+            if (!variables)
+                return [];
+            return variables.filter((variable) => variable.name.startsWith(variablePrefix)).map((variable) => {
+                const parts = variable.name.split('_');
+                const valParts = variable.value.split(/,(.*)/s);
+                const workflowInputs = valParts[1] && valParts[1].trim().length > 0 ? JSON.parse(valParts[1]) : undefined;
+                const inputsIgnore = inputs.inputsIgnore?.split(',').map((key) => key.trim());
+                inputsIgnore?.forEach((key) => {
+                    if (workflowInputs?.[key])
+                        delete workflowInputs[key];
+                });
+                return {
+                    variableName: variable.name,
+                    workflow_id: parts[2],
+                    date: new Date(+parts[3]),
+                    ref: valParts[0],
+                    inputs: workflowInputs
+                };
             });
-            return {
-                variableName: variable.name,
-                workflow_id: parts[2],
-                date: new Date(+parts[3]),
-                ref: valParts[0],
-                inputs: workflowInputs
-            };
         });
         return schedules;
     };
@@ -50315,10 +50318,10 @@ const run = async () => {
             return `${_workflow?.path || schedule.workflow_id}@${schedule.ref} will run ${durationString(new Date(Date.now()), schedule.date)} (${dateTimeFormatter.format(schedule.date)})}`;
         }).join('\n')}`);
         const startTime = Date.now().valueOf();
-        return (0, core_1.group)('👀 Looking for scheduled workflows to run', async () => {
-            do {
-                (0, core_1.info)(`👀 ... It's currently ${new Date().toLocaleTimeString()} and ${_schedules.length} workflows are scheduled to run.`);
-                if (inputs.skipCheckWorkflows.toLowerCase() === 'false') {
+        if (inputs.skipCheckWorkflows.toLowerCase() === 'false') {
+            return (0, core_1.group)('👀 Looking for scheduled workflows to run', async () => {
+                do {
+                    (0, core_1.info)(`👀 ... It's currently ${new Date().toLocaleTimeString()} and ${_schedules.length} workflows are scheduled to run.`);
                     for (const [index, schedule] of _schedules.entries()) {
                         if (Date.now().valueOf() < schedule.date.valueOf())
                             continue;
@@ -50337,17 +50340,17 @@ const run = async () => {
                         }));
                         _schedules.splice(index, 1);
                     }
-                }
-                else {
-                    (0, core_1.info)('Skipped running workflows...');
-                }
-                if (inputs.waitMs > 0) {
-                    await new Promise((resolve) => setTimeout(resolve, inputs.waitDelayMs));
-                }
-                _schedules = await getSchedules();
-            } while (inputs.waitMs > (Date.now().valueOf() - startTime) && _schedules.length);
-            (0, core_1.info)(`😪 No more workflows to run. I'll try again next time...`);
-        });
+                    if (inputs.waitMs > 0) {
+                        await new Promise((resolve) => setTimeout(resolve, inputs.waitDelayMs));
+                    }
+                    _schedules = await getSchedules();
+                } while (inputs.waitMs > (Date.now().valueOf() - startTime) && _schedules.length);
+                (0, core_1.info)(`😪 No more workflows to run. I'll try again next time...`);
+            });
+        }
+        else {
+            return (0, core_1.info)('⏩ Skipped running workflows...');
+        }
     };
     const summaryWrite = async () => {
         const schedules = await getSchedules();
@@ -50381,7 +50384,7 @@ const run = async () => {
         await summaryWrite();
     }
     else {
-        (0, core_1.info)('Skipped showing summary...');
+        (0, core_1.info)('⏩ Skipped showing summary...');
     }
 };
 exports.run = run;
