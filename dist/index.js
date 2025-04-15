@@ -50244,7 +50244,6 @@ const run = async () => {
     const ownerRepo = {
         owner: inputs.owner,
         repo: inputs.repo,
-        per_page: 100,
     };
     if (!inputs.token)
         return (0, core_1.setFailed)('`github-token` input is required');
@@ -50264,7 +50263,7 @@ const run = async () => {
         return 'in ' + Object.entries(duration).map(([key, value]) => `${value} ${key}`).join(', ');
     };
     const variablePrefix = '_SCHEDULE';
-    const workflows = (await octokit.rest.actions.listRepoWorkflows(ownerRepo)).data.workflows;
+    const workflows = (await octokit.rest.actions.listRepoWorkflows({ ...ownerRepo, per_page: 100 })).data.workflows;
     const workflow = workflows.find((workflow) => workflow.path.endsWith(inputs.workflow) || workflow.name === inputs.workflow || workflow.id === +inputs.workflow);
     if (!workflow) {
         throw new Error(`Workflow ${inputs.workflow} not found in ${ownerRepo.owner}/${ownerRepo.repo}`);
@@ -50273,7 +50272,7 @@ const run = async () => {
     const variableName = (date) => [variablePrefix, workflowId, date.valueOf()].join('_');
     const variableValue = (ref, inputs) => `${ref},${inputs ? JSON.stringify(inputs) : ''}`;
     const getSchedules = async () => {
-        const schedules = await octokit.paginate(octokit.rest.actions.listRepoVariables, ownerRepo)
+        const schedules = await octokit.paginate(octokit.rest.actions.listRepoVariables, { ...ownerRepo, per_page: 100 })
             .then((variables) => {
             if (!variables)
                 return [];

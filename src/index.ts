@@ -47,7 +47,6 @@ export const run = async (): Promise<void> => {
   const ownerRepo = {
     owner: inputs.owner,
     repo: inputs.repo,
-    per_page: 100,
   };
   if (!inputs.token) return setFailed('`github-token` input is required');
   const octokit = getOctokit(inputs.token);
@@ -65,7 +64,7 @@ export const run = async (): Promise<void> => {
     return 'in ' + Object.entries(duration).map(([key, value]) => `${value} ${key}`).join(', ');
   };
   const variablePrefix = '_SCHEDULE'
-  const workflows = (await octokit.rest.actions.listRepoWorkflows(ownerRepo)).data.workflows;
+  const workflows = (await octokit.rest.actions.listRepoWorkflows({...ownerRepo, per_page: 100})).data.workflows;
   const workflow = workflows.find((workflow) => workflow.path.endsWith(inputs.workflow) || workflow.name === inputs.workflow || workflow.id === +inputs.workflow);
   if (!workflow) {
     throw new Error(`Workflow ${inputs.workflow} not found in ${ownerRepo.owner}/${ownerRepo.repo}`);
@@ -74,26 +73,7 @@ export const run = async (): Promise<void> => {
   const variableName = (date: Date) => [variablePrefix, workflowId, date.valueOf()].join('_');
   const variableValue = (ref: string, inputs: object) => `${ref},${inputs ? JSON.stringify(inputs) : ''}`;
   const getSchedules = async () => {
-    // const { data: { variables } } = await octokit.rest.actions.listRepoVariables(ownerRepo);
-    // info(`variables: ${variables}`);
-    // if (!variables) return [];
-    // const schedules = variables.filter((variable) => variable.name.startsWith(variablePrefix)).map((variable) => {
-    //   const parts = variable.name.split('_');
-    //   const valParts = variable.value.split(/,(.*)/s);
-    //   const workflowInputs = valParts[1] && valParts[1].trim().length > 0 ? JSON.parse(valParts[1]) : undefined;
-    //   const inputsIgnore = inputs.inputsIgnore?.split(',').map((key) => key.trim());
-    //   inputsIgnore?.forEach((key) => {
-    //     if (workflowInputs?.[key]) delete workflowInputs[key];
-    //   });
-    //   return {
-    //     variableName: variable.name,
-    //     workflow_id: parts[2],
-    //     date: new Date(+parts[3]),
-    //     ref: valParts[0],
-    //     inputs: workflowInputs
-    //   }
-    // });
-    const schedules = await octokit.paginate(octokit.rest.actions.listRepoVariables, ownerRepo,)
+    const schedules = await octokit.paginate(octokit.rest.actions.listRepoVariables, {...ownerRepo, per_page: 100})
       .then((variables) => {
         if (!variables) return [];
         return variables.filter((variable) => variable.name.startsWith(variablePrefix)).map((variable) => {
