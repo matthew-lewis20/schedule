@@ -47,6 +47,7 @@ export const run = async (): Promise<void> => {
   const ownerRepo = {
     owner: inputs.owner,
     repo: inputs.repo,
+    per_page: 100,
   };
   if (!inputs.token) return setFailed('`github-token` input is required');
   const octokit = getOctokit(inputs.token);
@@ -76,7 +77,7 @@ export const run = async (): Promise<void> => {
     const variables = await octokit.paginate(octokit.rest.actions.listRepoVariables, ownerRepo, (response) => response.data.variables);
     // const { data: { variables } } = await octokit.rest.actions.listRepoVariables(ownerRepo);
     if (!variables) return [];
-    const schedules = variables.filter((variable) => variable.name.startsWith(variablePrefix)).map((variable) => {
+    const schedules = variables.filter((variable) => variable && typeof variable.name === 'string' && variable.name.startsWith(variablePrefix)).map((variable) => {
       const parts = variable.name.split('_');
       const valParts = variable.value.split(/,(.*)/s);
       const workflowInputs = valParts[1] && valParts[1].trim().length > 0 ? JSON.parse(valParts[1]) : undefined;
