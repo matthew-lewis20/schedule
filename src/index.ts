@@ -47,7 +47,6 @@ export const run = async (): Promise<void> => {
   const ownerRepo = {
     owner: inputs.owner,
     repo: inputs.repo,
-    per_page: 30,
   };
   if (!inputs.token) return setFailed('`github-token` input is required');
   const octokit = getOctokit(inputs.token);
@@ -74,7 +73,8 @@ export const run = async (): Promise<void> => {
   const variableName = (date: Date) => [variablePrefix, workflowId, date.valueOf()].join('_');
   const variableValue = (ref: string, inputs: object) => `${ref},${inputs ? JSON.stringify(inputs) : ''}`;
   const getSchedules = async () => {
-    const { data: { variables } } = await octokit.rest.actions.listRepoVariables(ownerRepo);
+    const variables = await octokit.paginate(octokit.rest.actions.listRepoVariables, ownerRepo, (response) => response.data.variables);
+    // const { data: { variables } } = await octokit.rest.actions.listRepoVariables(ownerRepo);
     if (!variables) return [];
     const schedules = variables.filter((variable) => variable.name.startsWith(variablePrefix)).map((variable) => {
       const parts = variable.name.split('_');

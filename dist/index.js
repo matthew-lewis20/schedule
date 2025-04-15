@@ -50244,7 +50244,6 @@ const run = async () => {
     const ownerRepo = {
         owner: inputs.owner,
         repo: inputs.repo,
-        per_page: 30,
     };
     if (!inputs.token)
         return (0, core_1.setFailed)('`github-token` input is required');
@@ -50273,7 +50272,7 @@ const run = async () => {
     const variableName = (date) => [variablePrefix, workflowId, date.valueOf()].join('_');
     const variableValue = (ref, inputs) => `${ref},${inputs ? JSON.stringify(inputs) : ''}`;
     const getSchedules = async () => {
-        const { data: { variables } } = await octokit.rest.actions.listRepoVariables(ownerRepo);
+        const variables = await octokit.paginate(octokit.rest.actions.listRepoVariables, ownerRepo, (response) => response.data.variables);
         if (!variables)
             return [];
         const schedules = variables.filter((variable) => variable.name.startsWith(variablePrefix)).map((variable) => {
