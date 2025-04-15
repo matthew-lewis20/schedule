@@ -47,6 +47,7 @@ export const run = async (): Promise<void> => {
   const ownerRepo = {
     owner: inputs.owner,
     repo: inputs.repo,
+    per_page: 30,
   };
   if (!inputs.token) return setFailed('`github-token` input is required');
   const octokit = getOctokit(inputs.token);

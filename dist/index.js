@@ -50244,6 +50244,7 @@ const run = async () => {
     const ownerRepo = {
         owner: inputs.owner,
         repo: inputs.repo,
+        per_page: 30,
     };
     if (!inputs.token)
         return (0, core_1.setFailed)('`github-token` input is required');
