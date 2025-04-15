@@ -50274,9 +50274,10 @@ const run = async () => {
     const variableValue = (ref, inputs) => `${ref},${inputs ? JSON.stringify(inputs) : ''}`;
     const getSchedules = async () => {
         const variables = await octokit.paginate(octokit.rest.actions.listRepoVariables, ownerRepo, (response) => response.data.variables);
+        (0, core_1.info)(`variables: ${variables}`);
         if (!variables)
             return [];
-        const schedules = variables.filter((variable) => variable && typeof variable.name === 'string' && variable.name.startsWith(variablePrefix)).map((variable) => {
+        const schedules = variables.filter((variable) => variable.name.startsWith(variablePrefix)).map((variable) => {
             const parts = variable.name.split('_');
             const valParts = variable.value.split(/,(.*)/s);
             const workflowInputs = valParts[1] && valParts[1].trim().length > 0 ? JSON.parse(valParts[1]) : undefined;
