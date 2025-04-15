@@ -50269,7 +50269,8 @@ const run = async () => {
         throw new Error(`Workflow ${inputs.workflow} not found in ${ownerRepo.owner}/${ownerRepo.repo}`);
     }
     const workflowId = workflow?.id;
-    const variableName = (date) => [variablePrefix, workflowId, date.valueOf()].join('_');
+    const uuid = process.env.GITHUB_RUN_ID;
+    const variableName = (date) => [variablePrefix, workflowId, date.valueOf(), uuid].join('_');
     const variableValue = (ref, inputs) => `${ref},${inputs ? JSON.stringify(inputs) : ''}`;
     const getSchedules = async () => {
         const schedules = await octokit.paginate(octokit.rest.actions.listRepoVariables, { ...ownerRepo, per_page: 100 })
@@ -50317,10 +50318,10 @@ const run = async () => {
             return `${_workflow?.path || schedule.workflow_id}@${schedule.ref} will run ${durationString(new Date(Date.now()), schedule.date)} (${dateTimeFormatter.format(schedule.date)})}`;
         }).join('\n')}`);
         const startTime = Date.now().valueOf();
-        return (0, core_1.group)('👀 Looking for scheduled workflows to run', async () => {
-            do {
-                (0, core_1.info)(`👀 ... It's currently ${new Date().toLocaleTimeString()} and ${_schedules.length} workflows are scheduled to run.`);
-                if (inputs.skipCheckWorkflows.toLowerCase() === 'false') {
+        if (inputs.skipCheckWorkflows.toLowerCase() === 'false') {
+            return (0, core_1.group)('👀 Looking for scheduled workflows to run', async () => {
+                do {
+                    (0, core_1.info)(`👀 ... It's currently ${new Date().toLocaleTimeString()} and ${_schedules.length} workflows are scheduled to run.`);
                     for (const [index, schedule] of _schedules.entries()) {
                         if (Date.now().valueOf() < schedule.date.valueOf())
                             continue;
@@ -50339,17 +50340,17 @@ const run = async () => {
                         }));
                         _schedules.splice(index, 1);
                     }
-                }
-                else {
-                    (0, core_1.info)('Skipped running workflows...');
-                }
-                if (inputs.waitMs > 0) {
-                    await new Promise((resolve) => setTimeout(resolve, inputs.waitDelayMs));
-                }
-                _schedules = await getSchedules();
-            } while (inputs.waitMs > (Date.now().valueOf() - startTime) && _schedules.length);
-            (0, core_1.info)(`😪 No more workflows to run. I'll try again next time...`);
-        });
+                    if (inputs.waitMs > 0) {
+                        await new Promise((resolve) => setTimeout(resolve, inputs.waitDelayMs));
+                    }
+                    _schedules = await getSchedules();
+                } while (inputs.waitMs > (Date.now().valueOf() - startTime) && _schedules.length);
+                (0, core_1.info)(`😪 No more workflows to run. I'll try again next time...`);
+            });
+        }
+        else {
+            return (0, core_1.info)('Skipped running workflows...');
+        }
     };
     const summaryWrite = async () => {
         const schedules = await getSchedules();
