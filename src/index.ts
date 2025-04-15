@@ -109,7 +109,6 @@ export const run = async (): Promise<void> => {
   }
   const scheduleRun = async () => {
     let _schedules = await getSchedules();
-    info(`number of schedules: ${_schedules.length}`);
     info(`⌚ ${dateTimeFormatter.format(new Date(Date.now()))}`);
     info(`📅 Found ${_schedules.length} scheduled workflows:\n${_schedules.map((schedule) => {
       const _workflow = workflows.find((workflow) => workflow.id === +schedule.workflow_id);
