@@ -50349,7 +50349,7 @@ const run = async () => {
             });
         }
         else {
-            return (0, core_1.info)('Skipped running workflows...');
+            return (0, core_1.info)('⏩ Skipped running workflows...');
         }
     };
     const summaryWrite = async () => {
@@ -50384,7 +50384,7 @@ const run = async () => {
         await summaryWrite();
     }
     else {
-        (0, core_1.info)('Skipped showing summary...');
+        (0, core_1.info)('⏩ Skipped showing summary...');
     }
 };
 exports.run = run;

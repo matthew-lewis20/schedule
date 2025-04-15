@@ -149,7 +149,7 @@ export const run = async (): Promise<void> => {
         info(`😪 No more workflows to run. I'll try again next time...`);
       });
     } else {
-      return info('Skipped running workflows...');
+      return info('⏩ Skipped running workflows...');
     }
   };
   const summaryWrite = async () => {
@@ -183,7 +183,7 @@ export const run = async (): Promise<void> => {
   if (inputs.skipSummary.toLowerCase() === 'false') {
     await summaryWrite();
   } else {
-    info('Skipped showing summary...');
+    info('⏩ Skipped showing summary...');
   }
 };
 
