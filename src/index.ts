@@ -74,26 +74,62 @@ export const run = async (): Promise<void> => {
   const variableName = (date: Date) => [variablePrefix, workflowId, date.valueOf()].join('_');
   const variableValue = (ref: string, inputs: object) => `${ref},${inputs ? JSON.stringify(inputs) : ''}`;
   const getSchedules = async () => {
-    const variables = await octokit.paginate(octokit.rest.actions.listRepoVariables, ownerRepo, (response) => response.data.variables);
     // const { data: { variables } } = await octokit.rest.actions.listRepoVariables(ownerRepo);
-    info(`variables: ${variables}`);
-    if (!variables) return [];
-    const schedules = variables.filter((variable) => variable.name.startsWith(variablePrefix)).map((variable) => {
-      const parts = variable.name.split('_');
-      const valParts = variable.value.split(/,(.*)/s);
-      const workflowInputs = valParts[1] && valParts[1].trim().length > 0 ? JSON.parse(valParts[1]) : undefined;
-      const inputsIgnore = inputs.inputsIgnore?.split(',').map((key) => key.trim());
-      inputsIgnore?.forEach((key) => {
-        if (workflowInputs?.[key]) delete workflowInputs[key];
+    // info(`variables: ${variables}`);
+    // if (!variables) return [];
+    // const schedules = variables.filter((variable) => variable.name.startsWith(variablePrefix)).map((variable) => {
+    //   const parts = variable.name.split('_');
+    //   const valParts = variable.value.split(/,(.*)/s);
+    //   const workflowInputs = valParts[1] && valParts[1].trim().length > 0 ? JSON.parse(valParts[1]) : undefined;
+    //   const inputsIgnore = inputs.inputsIgnore?.split(',').map((key) => key.trim());
+    //   inputsIgnore?.forEach((key) => {
+    //     if (workflowInputs?.[key]) delete workflowInputs[key];
+    //   });
+    //   return {
+    //     variableName: variable.name,
+    //     workflow_id: parts[2],
+    //     date: new Date(+parts[3]),
+    //     ref: valParts[0],
+    //     inputs: workflowInputs
+    //   }
+    // });
+
+    const variables = await octokit.paginate(octokit.rest.actions.listRepoVariables, ownerRepo, 
+      (response) => Array.isArray(response.data?.variables) ? response.data.variables : []
+    );
+
+    info(`variables: ${JSON.stringify(variables, null, 2)}`); // Safe debug
+
+    const schedules = variables
+      .filter((variable) => variable && typeof variable.name === 'string' && variable.name.startsWith(variablePrefix))
+      .map((variable) => {
+        const parts = variable.name.split('_');
+        const valParts = variable.value.split(/,(.*)/s);
+
+        let workflowInputs;
+        try {
+          workflowInputs = valParts[1] && valParts[1].trim().length > 0
+            ? JSON.parse(valParts[1])
+            : undefined;
+        } catch (err) {
+          info(`Error parsing JSON from variable: ${variable.name}, value: ${valParts[1]}`);
+          workflowInputs = undefined;
+        }
+
+        const inputsIgnore = inputs.inputsIgnore?.split(',').map((key) => key.trim());
+        inputsIgnore?.forEach((key) => {
+          if (workflowInputs?.[key]) delete workflowInputs[key];
+        });
+
+        return {
+          variableName: variable.name,
+          workflow_id: parts[2],
+          date: new Date(+parts[3]),
+          ref: valParts[0],
+          inputs: workflowInputs
+        };
       });
-      return {
-        variableName: variable.name,
-        workflow_id: parts[2],
-        date: new Date(+parts[3]),
-        ref: valParts[0],
-        inputs: workflowInputs
-      }
-    });
+    
     return schedules;
   };
   const scheduleAdd = async () => {
