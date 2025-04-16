@@ -49,14 +49,6 @@ inputs:
     description: 'Inputs to ignore when passing to the workflow'
     default: 'date,workflow'
     required: false
-  skip-check-workflows:
-    description: 'Optional option to disable the check for workflows'
-    default: 'false'
-    required: false
-  skip-summary:
-    description: 'Optional option to disable the summary'
-    default: 'false'
-    required: false
 
 runs:
   using: "node20"
