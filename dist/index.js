@@ -50261,7 +50261,7 @@ const run = async () => {
         return 'in ' + Object.entries(duration).map(([key, value]) => `${value} ${key}`).join(', ');
     };
     const variablePrefix = '_SCHEDULE';
-    const workflows = await octokit.paginate(octokit.rest.actions.listRepoWorkflows, { ...ownerRepo, per_page: 100, }, (response) => response.data.workflows);
+    const workflows = await octokit.paginate(octokit.rest.actions.listRepoWorkflows, { ...ownerRepo, per_page: 100, });
     const workflow = workflows.find((workflow) => workflow.path.endsWith(inputs.workflow) || workflow.name === inputs.workflow || workflow.id === +inputs.workflow);
     if (!workflow) {
         throw new Error(`Workflow ${inputs.workflow} not found in ${ownerRepo.owner}/${ownerRepo.repo}`);
