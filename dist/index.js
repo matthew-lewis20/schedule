@@ -50235,8 +50235,6 @@ const getInputs = () => {
     const workflowInputs = (0, core_1.getInput)("inputs");
     result.inputs = workflowInputs && workflowInputs.trim().length > 0 ? JSON.parse(workflowInputs) : undefined;
     result.inputsIgnore = (0, core_1.getInput)("inputs-ignore");
-    result.skipCheckWorkflows = (0, core_1.getInput)("skip-check-workflows");
-    result.skipSummary = (0, core_1.getInput)("skip-summary");
     return result;
 };
 const run = async () => {
@@ -50263,14 +50261,13 @@ const run = async () => {
         return 'in ' + Object.entries(duration).map(([key, value]) => `${value} ${key}`).join(', ');
     };
     const variablePrefix = '_SCHEDULE';
-    const workflows = (await octokit.rest.actions.listRepoWorkflows({ ...ownerRepo, per_page: 100 })).data.workflows;
+    const workflows = await octokit.paginate(octokit.rest.actions.listRepoWorkflows, { ...ownerRepo, per_page: 100, });
     const workflow = workflows.find((workflow) => workflow.path.endsWith(inputs.workflow) || workflow.name === inputs.workflow || workflow.id === +inputs.workflow);
     if (!workflow) {
         throw new Error(`Workflow ${inputs.workflow} not found in ${ownerRepo.owner}/${ownerRepo.repo}`);
     }
     const workflowId = workflow?.id;
-    const uuid = process.env.GITHUB_RUN_ID;
-    const variableName = (date) => [variablePrefix, workflowId, date.valueOf(), uuid].join('_');
+    const variableName = (date) => [variablePrefix, workflowId, date.valueOf()].join('_');
     const variableValue = (ref, inputs) => `${ref},${inputs ? JSON.stringify(inputs) : ''}`;
     const getSchedules = async () => {
         const schedules = await octokit.paginate(octokit.rest.actions.listRepoVariables, { ...ownerRepo, per_page: 100 })
@@ -50318,39 +50315,34 @@ const run = async () => {
             return `${_workflow?.path || schedule.workflow_id}@${schedule.ref} will run ${durationString(new Date(Date.now()), schedule.date)} (${dateTimeFormatter.format(schedule.date)})}`;
         }).join('\n')}`);
         const startTime = Date.now().valueOf();
-        if (inputs.skipCheckWorkflows.toLowerCase() === 'false') {
-            return (0, core_1.group)('👀 Looking for scheduled workflows to run', async () => {
-                do {
-                    (0, core_1.info)(`👀 ... It's currently ${new Date().toLocaleTimeString()} and ${_schedules.length} workflows are scheduled to run.`);
-                    for (const [index, schedule] of _schedules.entries()) {
-                        if (Date.now().valueOf() < schedule.date.valueOf())
-                            continue;
-                        const _workflow = workflows.find((workflow) => workflow.id === +schedule.workflow_id);
-                        (0, core_1.info)(`🚀 Running ${_workflow?.path || schedule.workflow_id}@ref:${schedule.ref} set for ${dateTimeFormatter.format(schedule.date)}`);
-                        await octokit.rest.actions.createWorkflowDispatch({
-                            ...ownerRepo,
-                            workflow_id: schedule.workflow_id,
-                            ref: schedule.ref,
-                            inputs: schedule.inputs
-                        }).catch((err) => {
-                            (0, core_1.warning)(`Failed to run ${_workflow?.path || schedule.workflow_id}@${schedule.ref} set for ${dateTimeFormatter.format(schedule.date)}:\nError: ${err instanceof Error ? err.message : err}`);
-                        }).then(() => octokit.rest.actions.deleteRepoVariable({
-                            ...ownerRepo,
-                            name: schedule.variableName,
-                        }));
-                        _schedules.splice(index, 1);
-                    }
-                    if (inputs.waitMs > 0) {
-                        await new Promise((resolve) => setTimeout(resolve, inputs.waitDelayMs));
-                    }
-                    _schedules = await getSchedules();
-                } while (inputs.waitMs > (Date.now().valueOf() - startTime) && _schedules.length);
-                (0, core_1.info)(`😪 No more workflows to run. I'll try again next time...`);
-            });
-        }
-        else {
-            return (0, core_1.info)('⏩ Skipped running workflows...');
-        }
+        return (0, core_1.group)('👀 Looking for scheduled workflows to run', async () => {
+            do {
+                (0, core_1.info)(`👀 ... It's currently ${new Date().toLocaleTimeString()} and ${_schedules.length} workflows are scheduled to run.`);
+                for (const [index, schedule] of _schedules.entries()) {
+                    if (Date.now().valueOf() < schedule.date.valueOf())
+                        continue;
+                    const _workflow = workflows.find((workflow) => workflow.id === +schedule.workflow_id);
+                    (0, core_1.info)(`🚀 Running ${_workflow?.path || schedule.workflow_id}@ref:${schedule.ref} set for ${dateTimeFormatter.format(schedule.date)}`);
+                    await octokit.rest.actions.createWorkflowDispatch({
+                        ...ownerRepo,
+                        workflow_id: schedule.workflow_id,
+                        ref: schedule.ref,
+                        inputs: schedule.inputs
+                    }).catch((err) => {
+                        (0, core_1.warning)(`Failed to run ${_workflow?.path || schedule.workflow_id}@${schedule.ref} set for ${dateTimeFormatter.format(schedule.date)}:\nError: ${err instanceof Error ? err.message : err}`);
+                    }).then(() => octokit.rest.actions.deleteRepoVariable({
+                        ...ownerRepo,
+                        name: schedule.variableName,
+                    }));
+                    _schedules.splice(index, 1);
+                }
+                if (inputs.waitMs > 0) {
+                    await new Promise((resolve) => setTimeout(resolve, inputs.waitDelayMs));
+                }
+                _schedules = await getSchedules();
+            } while (inputs.waitMs > (Date.now().valueOf() - startTime) && _schedules.length);
+            (0, core_1.info)(`😪 No more workflows to run. I'll try again next time...`);
+        });
     };
     const summaryWrite = async () => {
         const schedules = await getSchedules();
@@ -50380,12 +50372,7 @@ const run = async () => {
         await scheduleAdd();
     }
     await scheduleRun();
-    if (inputs.skipSummary.toLowerCase() === 'false') {
-        await summaryWrite();
-    }
-    else {
-        (0, core_1.info)('⏩ Skipped showing summary...');
-    }
+    await summaryWrite();
 };
 exports.run = run;
 (0, exports.run)();

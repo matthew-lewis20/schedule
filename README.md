@@ -183,8 +183,6 @@ Various inputs are defined in [`action.yml`](action.yml):
 | timezone | Timezone to use for the schedule | EST |
 | inputs | Inputs to pass to the workflow |
 | inputs-ignore | Inputs to ignore when passing to the workflow | date,workflow |
-| skip-check-workflows | Optional choice to skip checking and running workflows | false |
-| skip-summary | Optional choice to skip displaying the scheduled jobs summary | false |
 
 <!-- 
 ## ⬅️ Outputs
