@@ -1,7 +1,5 @@
 # 📅 Schedule Workflow Runs Action
 
-**This is a forked repo - original repo can be found here: [austenstone/schedule](https://github.com/austenstone/schedule)**
-
 Schedule your GitHub Actions workflows to run at a future date and time! 🤯
 
 This works using the [`schedule`](https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#schedule) event to poll GitHub variables which are used as our database for scheduling.
